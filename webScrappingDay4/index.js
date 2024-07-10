@@ -1,88 +1,75 @@
-const axios = require('axios')
-const cheerio = require('cheerio')
-const xlsx = require('xlsx')
-const fs = require('fs')
-const pageUrl = 'https://www.amazon.in/s?k=phone&crid=1UZM8ZZ5KFBY1&sprefix=phon%2Caps%2C236&ref=nb_sb_noss_2'
+const cheerio = require("cheerio");
+const xlsx = require("xlsx");
+const axios = require("axios");
 
-const getPageData = async () => {
-    try{
-        const response = await axios.get(pageUrl)
-        // console.log(response);
-        const data = response.data
-        console.log(data);
+const getData = async () => {
+    
 
-        const pageData = data
-        const $ = cheerio.load(pageData.toString())
+    const response = await axios.get('https://www.amazon.in/s?k=phone&crid=1FXBLMMMSPCUV&sprefix=phone%2Caps%2C313&ref=nb_sb_ss_pltr-sample-20_2_5')
 
-        const titles = $('.a-size-medium.a-color-base.a-text-normal')
+    const data = response.data
 
-const prices = $('.a-price-whole')
+    const $ = cheerio.load(data.toString());
 
-const ratings = $('.a-icon.a-icon-star-small')
+    const titles = $(".a-size-medium.a-color-base.a-text-normal"); // Input -> document.querySelector("TARGETING INFORMATION")
 
-const availabilities = $(".a-color-price");
+    const titlesData = [];
 
-const titlesData = []
-const pricesData = []
-const ratingsData = []
-const availabilitiesData = []
+    titles.each((index, element) => {
+      const title = $(element).text();
+      titlesData.push(title);
+      // products.push({
+      //   name: title,
+      // });
+    });
 
-titles.each((index,element)=>{
-    const title = $(element).text()
-    // console.log(title);
-    titlesData.push(title)
-})
+    const pricesData = [];
 
+    const prices = $(".a-price-whole");
+    // console.log(prices);
+    prices.each((index, element) => {
+      const price = $(element).text();
+      // console.log(price);
+      pricesData.push(price);
+    });
 
-prices.each((index,element)=>{
-    const price = $(element).text()
-    // console.log(price);
-    pricesData.push(price)
-})
+    const ratingsData = [];
 
-ratings.each((index,element)=>{
-    const rating = $(element).text()
-    ratingsData.push(rating)
-})
+    const ratings = $(".a-icon-star-small .a-icon-alt");
+        ratings.each((index, element) => {
+            const rating = $(element).text().trim();
+            ratingsData.push(rating);
+        });
 
-availabilities.each((index,element)=>{
-    const availability = $(element).text()
-    availabilitiesData.push(availability)
-})
+        const availabilityData = [];
 
-const productsJson = titlesData.map((title,index)=>{
-    return{
+        const availability = $(".a-color-price");
+        availability.each((index, element) => {
+            const avail = $(element).text().trim();
+            availabilityData.push(avail);
+        });
+
+    // console.log(titlesData);
+    // console.log(pricesData);
+
+    const productsJson = titlesData.map((title, index) => {
+      return {
         title,
-        price : pricesData[index],
-        rating : ratingsData[index],
-        availability : availabilitiesData[index]
-    }
-})
+        price: pricesData[index],
+        rating: ratingsData[index],
+        // availability: availabilityData[index]
+      };
+    });
+
+    // console.log(productsJson);
+
+    const workbook = xlsx.utils.book_new();
+    const sheet = xlsx.utils.json_to_sheet(productsJson);
+
+    xlsx.utils.book_append_sheet(workbook, sheet, "Products");
+    xlsx.writeFile(workbook, "products.xlsx");
 
 
-// make workbook
-
-const workBook = xlsx.utils.book_new()
-
-// make sheet
-
-const sheet = xlsx.utils.json_to_sheet(productsJson)
-
-// attach workbook to the sheet
-
-xlsx.utils.book_append_sheet(workBook,sheet,'Products')
-
-// make a xlsx file
-
-xlsx.writeFile(workBook,'Products.xlsx')
-
-console.log('File saved successfully to excel!');
-
-    }
-
-    catch (err) {
-        console.log(err);
-    }
 }
 
- getPageData()
+getData()
