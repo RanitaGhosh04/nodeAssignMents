@@ -1,80 +1,113 @@
-const express = require('express');
-const fs = require('fs').promises;
-const path = require('path');
-const { nanoid } = require('nanoid');
+import express from 'express'
+import { nanoid } from 'nanoid'
+import fs from 'fs'
+import { fileURLToPath } from "url";
+import path from "path";
 
-const app = express();
-const port = process.env.PORT || 3000;
-const urlsFile = path.join(__dirname, 'urls.json');
-
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-
-// Helper function to read URLs from file
-async function readUrls() {
-  try {
-    const data = await fs.readFile(urlsFile, 'utf8');
-    return JSON.parse(data);
-  } catch (error) {
-    if (error.code === 'ENOENT') {
-      // File doesn't exist, return an empty object
-      return {};
-    }
-    throw error;
+// check whether valid url
+const isUrlValid = (url) => {
+  try{
+    new URL(url)
+    return true
+  }
+  catch(err)
+  {
+    return false
   }
 }
 
-// Helper function to write URLs to file
-async function writeUrls(urls) {
-  await fs.writeFile(urlsFile, JSON.stringify(urls, null, 2));
-}
+// create server
+const app = express()
 
-// Shorten URL
-app.post('/shorten', async (req, res) => {
-  const { url } = req.body;
+// to not get undefined in req.body
+app.use(express.json())
 
-  if (!url) {
-    return res.status(400).json({ error: 'URL is required' });
-  }
+// show the html form on the browser using nodejs
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
-  try {
-    const urls = await readUrls();
-    
-    // Check if URL already exists
-    for (const [shortCode, originalUrl] of Object.entries(urls)) {
-      if (originalUrl === url) {
-        return res.json({ shortUrl: `http://localhost:${port}/${shortCode}` });
-      }
-    }
+// to get the data of the file 
+app.get("/", (req, res) => {
 
-    const shortCode = nanoid(6);
-    urls[shortCode] = url;
-
-    await writeUrls(urls);
-
-    res.json({ shortUrl: `http://localhost:${port}/${shortCode}` });
-  } catch (error) {
-    res.status(500).json({ error: 'Server error' });
-  }
+  // send to browser
+  res.sendFile(__dirname + "/urlform.html");
 });
 
-// Redirect to original URL
-app.get('/:shortCode', async (req, res) => {
-  const { shortCode } = req.params;
+// 1. Make short Url API
+app.post("/shorten",(req,res)=>{
 
-  try {
-    const urls = await readUrls();
-
-    if (urls[shortCode]) {
-      return res.redirect(urls[shortCode]);
-    }
-
-    res.status(404).json({ error: 'URL not found' });
-  } catch (error) {
-    res.status(500).json({ error: 'Server error' });
+  // is the url valid
+  const isValidUrl = isUrlValid(req.body.longUrl);
+  if (!isValidUrl) {
+    return res.status(400).json({
+      success: false,
+      message: "Please provide a valid longUrl",
+    });
   }
-});
 
-app.listen(port, () => {
-  console.log(`URL shortener app listening at http://localhost:${port}`);
-});
+  
+  // get longUrl from body
+  // console.log(req.body.longUrl);
+  const shortUrl = nanoid(5)
+
+  // to not loose the previous data store somewhere
+   // to not get in buffer form, do in string form
+  const urlsFromFile = fs.readFileSync('urls.json',{encoding : 'utf-8'})
+
+  // to get in json format
+  const urlsJson = JSON.parse(urlsFromFile)
+
+  // console.log(urlsJson);
+
+  // to identify whic short url belongs to which long url we need to store it somewhere
+  // const urls = [
+  //   {
+  //     // shortUrl : longUrl
+
+  //     // since shorturl is dynamic therefore it is in []
+  //     [shortUrl] : req.body.longUrl
+  //   }
+  // ]
+
+  // the part can be replaced
+
+  // to add the new url
+  urlsJson[shortUrl] = req.body.longUrl
+  
+  // whenever we store in file, we store in the form of string
+  // write the updated data in the file
+  fs.writeFileSync('urls.json',JSON.stringify(urlsJson))
+
+  res.json({
+    success : true,
+    data : `http://localhost//10000/${shortUrl}`
+  })
+})
+
+
+// 2. Make short to long Url API
+app.get('/:shortUrl',(req,res)=>{
+  console.log(req.param.shortUrl);
+
+  // to get the long url against the short url
+  const {shortUrl} = req.params
+
+  const urls = fs.readFileSync('urls.json',{encoding : 'utf-8'})
+  const urlsJson = JSON.parse(urls)
+
+  // get the long url agaist short url
+  const longUrl = urlsJson[shortUrl]
+  console.log(longUrl);
+
+  // res.json({
+  //   success : true,
+  //   message : 'Long Url'
+  // })
+
+  // redirect the short url to long url
+  res.redirect(longUrl)
+})
+
+
+// port joining
+app.listen(10000,()=>console.log('Server is up and running at port 10000'))
